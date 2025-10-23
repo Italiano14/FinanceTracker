@@ -1,0 +1,13 @@
+{
+  "name": "financetracker-static",
+  "version": "1.0.0",
+  "description": "FinanceTracker - Aplicación de seguimiento de finanzas",
+  "main": "index.html",
+  "scripts": {
+    "build": "echo 'No build step'",
+    "dev": "python -m http.server 8000"
+  },
+  "keywords": ["finanzas", "tracker", "gastos", "ingresos"],
+  "author": "Tu Nombre",
+  "license": "MIT"
+}

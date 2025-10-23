@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gráficos - FinanceTracker</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="icon" href="../img/logo_finanzas-removebg-preview.png" type="image/img">
+    <link href="css/style.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="dashboard.html">
+                <i class="fas fa-chart-line me-2"></i>FinanceTracker
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="dashboard.html"><i class="fas fa-arrow-left me-1"></i> Volver al Dashboard</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h2 class="mb-4"><i class="fas fa-chart-bar me-2"></i>Análisis Gráfico</h2>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Gastos por Categoría</h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="gastosCategoriaChart" height="300"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Evolución Mensual</h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="evolucionMensualChart" height="300"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Resumen de Datos</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Gastos del Mes Actual</h6>
+                                <div id="resumenGastos">
+                                    <!-- Los gastos se cargarán aquí -->
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Estadísticas</h6>
+                                <div id="estadisticas">
+                                    <!-- Las estadísticas se cargarán aquí -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/data.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (!isLoggedIn()) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            cargarGraficos();
+        });
+
+        function cargarGraficos() {
+            const usuarioId = authManager.getCurrentUser().id;
+            const movimientos = dataManager.obtenerMovimientosDelMes(usuarioId);
+            const categorias = dataManager.obtenerCategorias(usuarioId);
+
+            // Gráfico de gastos por categoría
+            const gastosPorCategoria = calcularGastosPorCategoria(movimientos, categorias);
+            crearGraficoPastel(gastosPorCategoria);
+
+            // Gráfico de evolución mensual
+            const datosMensuales = calcularEvolucionMensual(usuarioId);
+            crearGraficoLineal(datosMensuales);
+
+            // Actualizar resumen
+            actualizarResumen(gastosPorCategoria);
+        }
+
+        function calcularGastosPorCategoria(movimientos, categorias) {
+            const gastos = {};
+            
+            categorias.forEach(cat => {
+                if (cat.tipo === 'gasto') {
+                    gastos[cat.nombre] = 0;
+                }
+            });
+
+            movimientos.forEach(mov => {
+                const categoria = categorias.find(c => c.id === mov.categoriaId);
+                if (categoria && categoria.tipo === 'gasto') {
+                    gastos[categoria.nombre] += parseFloat(mov.monto);
+                }
+            });
+
+            return Object.entries(gastos)
+                .filter(([_, total]) => total > 0)
+                .sort((a, b) => b[1] - a[1]);
+        }
+
+        function crearGraficoPastel(datos) {
+            const ctx = document.getElementById('gastosCategoriaChart').getContext('2d');
+            const colores = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'];
+            
+            new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: datos.map(d => d[0]),
+                    datasets: [{
+                        data: datos.map(d => d[1]),
+                        backgroundColor: colores
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                        },
+                        title: {
+                            display: true,
+                            text: 'Distribución de Gastos'
+                        }
+                    }
+                }
+            });
+        }
+
+        function calcularEvolucionMensual(usuarioId) {
+            const meses = [];
+            const ingresos = [];
+            const gastos = [];
+            
+            for (let i = 5; i >= 0; i--) {
+                const fecha = new Date();
+                fecha.setMonth(fecha.getMonth() - i);
+                const mes = fecha.toLocaleDateString('es-ES', { month: 'short' });
+                
+                const movimientosMes = dataManager.obtenerMovimientos(usuarioId)
+                    .filter(m => {
+                        const movFecha = new Date(m.fecha);
+                        return movFecha.getMonth() === fecha.getMonth() && 
+                               movFecha.getFullYear() === fecha.getFullYear();
+                    });
+                
+                const totalIngresos = movimientosMes
+                    .filter(m => {
+                        const cat = dataManager.obtenerCategoria(m.categoriaId);
+                        return cat && cat.tipo === 'ingreso';
+                    })
+                    .reduce((sum, m) => sum + parseFloat(m.monto), 0);
+                
+                const totalGastos = movimientosMes
+                    .filter(m => {
+                        const cat = dataManager.obtenerCategoria(m.categoriaId);
+                        return cat && cat.tipo === 'gasto';
+                    })
+                    .reduce((sum, m) => sum + parseFloat(m.monto), 0);
+                
+                meses.push(mes);
+                ingresos.push(totalIngresos);
+                gastos.push(totalGastos);
+            }
+            
+            return { meses, ingresos, gastos };
+        }
+
+        function crearGraficoLineal(datos) {
+            const ctx = document.getElementById('evolucionMensualChart').getContext('2d');
+            
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: datos.meses,
+                    datasets: [
+                        {
+                            label: 'Ingresos',
+                            data: datos.ingresos,
+                            borderColor: '#28a745',
+                            backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                            fill: true,
+                            tension: 0.3
+                        },
+                        {
+                            label: 'Gastos',
+                            data: datos.gastos,
+                            borderColor: '#dc3545',
+                            backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                            fill: true,
+                            tension: 0.3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Evolución últimos 6 meses'
+                        }
+                    }
+                }
+            });
+        }
+
+        function actualizarResumen(gastos) {
+            const resumenHTML = gastos.map(([categoria, total]) => `
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span>${categoria}</span>
+                    <strong class="text-danger">$${total.toFixed(2)}</strong>
+                </div>
+            `).join('');
+            
+            document.getElementById('resumenGastos').innerHTML = resumenHTML || '<p class="text-muted">No hay gastos este mes</p>';
+            
+            const totalGastos = gastos.reduce((sum, [_, total]) => sum + total, 0);
+            const totalMovimientos = dataManager.obtenerMovimientosDelMes(authManager.getCurrentUser().id).length;
+            
+            document.getElementById('estadisticas').innerHTML = `
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Total Gastos:</span>
+                    <strong>$${totalGastos.toFixed(2)}</strong>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Movimientos del mes:</span>
+                    <strong>${totalMovimientos}</strong>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span>Categorías con gastos:</span>
+                    <strong>${gastos.length}</strong>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

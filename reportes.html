@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reportes - FinanceTracker</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="icon" href="../img/logo_finanzas-removebg-preview.png" type="image/img">
+    <link rel="icon" href="../img/logo_finanzas-removebg-preview.png" type="image/img">
+    <link href="css/style.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="dashboard.html">
+                <i class="fas fa-chart-line me-2"></i>FinanceTracker
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="dashboard.html"><i class="fas fa-arrow-left me-1"></i> Volver al Dashboard</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h2 class="mb-4"><i class="fas fa-file-alt me-2"></i>Reportes Mensuales</h2>
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                        <label for="mes" class="form-label">Mes</label>
+                        <select class="form-select" id="mes">
+                            <option value="1">Enero</option>
+                            <option value="2">Febrero</option>
+                            <option value="3">Marzo</option>
+                            <option value="4">Abril</option>
+                            <option value="5">Mayo</option>
+                            <option value="6">Junio</option>
+                            <option value="7">Julio</option>
+                            <option value="8">Agosto</option>
+                            <option value="9">Septiembre</option>
+                            <option value="10">Octubre</option>
+                            <option value="11">Noviembre</option>
+                            <option value="12">Diciembre</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="anio" class="form-label">Año</label>
+                        <select class="form-select" id="anio">
+                            <!-- Los años se cargarán dinámicamente -->
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <button class="btn btn-primary w-100" onclick="cargarReporte()">
+                            <i class="fas fa-filter me-1"></i> Filtrar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card text-white bg-success">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Total Ingresos</h5>
+                        <p class="card-text h3" id="totalIngresos">$0.00</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-white bg-danger">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Total Gastos</h5>
+                        <p class="card-text h3" id="totalGastos">$0.00</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-white bg-info">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Balance</h5>
+                        <p class="card-text h3" id="balance">$0.00</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Movimientos del Mes</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="listaMovimientos" style="max-height: 400px; overflow-y: auto;">
+                            <!-- Los movimientos se cargarán aquí -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Gastos por Categoría</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="gastosCategoria">
+                            <!-- Los gastos por categoría se cargarán aquí -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/data.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (!isLoggedIn()) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            cargarSelectAnios();
+            // Establecer mes actual por defecto
+            const mesActual = new Date().getMonth() + 1;
+            document.getElementById('mes').value = mesActual;
+            
+            cargarReporte();
+        });
+
+        function cargarSelectAnios() {
+            const selectAnio = document.getElementById('anio');
+            const anioActual = new Date().getFullYear();
+            
+            for (let i = anioActual; i >= anioActual - 5; i--) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = i;
+                if (i === anioActual) {
+                    option.selected = true;
+                }
+                selectAnio.appendChild(option);
+            }
+        }
+
+        function cargarReporte() {
+            const mes = parseInt(document.getElementById('mes').value);
+            const anio = parseInt(document.getElementById('anio').value);
+            const usuarioId = authManager.getCurrentUser().id;
+
+            const movimientos = dataManager.obtenerMovimientos(usuarioId)
+                .filter(m => {
+                    const fecha = new Date(m.fecha);
+                    return fecha.getMonth() + 1 === mes && fecha.getFullYear() === anio;
+                });
+
+            const categorias = dataManager.obtenerCategorias(usuarioId);
+
+            calcularTotales(movimientos, categorias);
+            mostrarMovimientos(movimientos, categorias);
+            mostrarGastosPorCategoria(movimientos, categorias);
+        }
+
+        function calcularTotales(movimientos, categorias) {
+            let totalIngresos = 0;
+            let totalGastos = 0;
+
+            movimientos.forEach(mov => {
+                const categoria = categorias.find(c => c.id === mov.categoriaId);
+                if (categoria) {
+                    if (categoria.tipo === 'ingreso') {
+                        totalIngresos += parseFloat(mov.monto);
+                    } else {
+                        totalGastos += parseFloat(mov.monto);
+                    }
+                }
+            });
+
+            document.getElementById('totalIngresos').textContent = `$${totalIngresos.toFixed(2)}`;
+            document.getElementById('totalGastos').textContent = `$${totalGastos.toFixed(2)}`;
+            document.getElementById('balance').textContent = `$${(totalIngresos - totalGastos).toFixed(2)}`;
+        }
+
+        function mostrarMovimientos(movimientos, categorias) {
+            const container = document.getElementById('listaMovimientos');
+            
+            if (movimientos.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-4">
+                        <i class="fas fa-receipt fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">No hay movimientos para este período.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const movimientosHTML = movimientos.map(mov => {
+                const categoria = categorias.find(c => c.id === mov.categoriaId);
+                const tipo = categoria?.tipo || 'gasto';
+                const colorClase = tipo === 'ingreso' ? 'text-success' : 'text-danger';
+                const icono = tipo === 'ingreso' ? 'fa-arrow-up' : 'fa-arrow-down';
+
+                return `
+                    <div class="d-flex justify-content-between align-items-center border-bottom py-2">
+                        <div class="flex-grow-1">
+                            <div class="fw-bold">${mov.descripcion}</div>
+                            <small class="text-muted">
+                                ${new Date(mov.fecha).toLocaleDateString('es-ES')} • 
+                                <span class="badge bg-${tipo === 'ingreso' ? 'success' : 'danger'}">
+                                    ${categoria?.nombre || 'Sin categoría'}
+                                </span>
+                            </small>
+                        </div>
+                        <div class="${colorClase} fw-bold">
+                            <i class="fas ${icono} me-1"></i>
+                            $${parseFloat(mov.monto).toFixed(2)}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = movimientosHTML;
+        }
+
+        function mostrarGastosPorCategoria(movimientos, categorias) {
+            const container = document.getElementById('gastosCategoria');
+            const gastos = {};
+
+            // Inicializar categorías de gastos
+            categorias.forEach(cat => {
+                if (cat.tipo === 'gasto') {
+                    gastos[cat.nombre] = 0;
+                }
+            });
+
+            // Calcular totales
+            movimientos.forEach(mov => {
+                const categoria = categorias.find(c => c.id === mov.categoriaId);
+                if (categoria && categoria.tipo === 'gasto') {
+                    gastos[categoria.nombre] += parseFloat(mov.monto);
+                }
+            });
+
+            // Filtrar categorías con gastos y ordenar
+            const gastosFiltrados = Object.entries(gastos)
+                .filter(([_, total]) => total > 0)
+                .sort((a, b) => b[1] - a[1]);
+
+            if (gastosFiltrados.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-4">
+                        <i class="fas fa-chart-pie fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">No hay gastos para este período.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const gastosHTML = gastosFiltrados.map(([categoria, total]) => `
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span>${categoria}</span>
+                    <strong class="text-danger">$${total.toFixed(2)}</strong>
+                </div>
+                <div class="progress mb-3" style="height: 8px;">
+                    <div class="progress-bar bg-danger" style="width: ${(total / Math.max(...gastosFiltrados.map(g => g[1]))) * 100}%"></div>
+                </div>
+            `).join('');
+
+            container.innerHTML = gastosHTML;
+        }
+    </script>
+</body>
+</html>
